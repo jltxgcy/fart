@@ -1,0 +1,104 @@
+diff --git a/libdexfile/dex/standard_dex_file.h b/libdexfile/dex/standard_dex_file.h
+index 999e5b9..c5e699d 100644
+--- a/libdexfile/dex/standard_dex_file.h
++++ b/libdexfile/dex/standard_dex_file.h
+@@ -35,7 +35,7 @@ class StandardDexFile : public DexFile {
+   struct CodeItem : public DexFile::CodeItem {
+     static constexpr size_t kAlignment = 4;
+ 
+-   private:
++   public:
+     CodeItem() = default;
+ 
+     uint16_t registers_size_;            // the number of registers used by this code
+diff --git a/runtime/art_method-inl.h b/runtime/art_method-inl.h
+index c1fac36..5ae8144 100644
+--- a/runtime/art_method-inl.h
++++ b/runtime/art_method-inl.h
+@@ -178,6 +178,21 @@ inline const DexFile* ArtMethod::GetDexFile() {
+   return GetDexCache<kWithoutReadBarrier>()->GetDexFile();
+ }
+ 
++inline void ArtMethod::DumpArtMethod() {
++  const DexFile* dex_file = GetDexFile();
++  const DexFile::CodeItem* code_item= GetCodeItem();
++  if (dex_file != NULL && code_item != NULL && !dex_file->IsCompactDexFile())
++  {
++    const StandardDexFile::CodeItem& standardCodeItem = down_cast<const StandardDexFile::CodeItem&>(*code_item);
++    LOG(ERROR) << "fartlog, DumpArtMethod code_item length:" << standardCodeItem.insns_size_in_code_units_;
++    for (int i = 0 ; i <  (int)standardCodeItem.insns_size_in_code_units_; i++)
++    {
++        LOG(ERROR) << "fartlog, DumpArtMethod code_item content:" << standardCodeItem.insns_[i];
++    }
++    
++  }
++}
++
+ inline const char* ArtMethod::GetDeclaringClassDescriptor() {
+   uint32_t dex_method_idx = GetDexMethodIndex();
+   if (UNLIKELY(dex_method_idx == dex::kDexNoIndex)) {
+diff --git a/runtime/art_method.h b/runtime/art_method.h
+index 012d706..2e3d041 100644
+--- a/runtime/art_method.h
++++ b/runtime/art_method.h
+@@ -579,6 +579,8 @@ class ArtMethod FINAL {
+ 
+   const DexFile* GetDexFile() REQUIRES_SHARED(Locks::mutator_lock_);
+ 
++  void DumpArtMethod() REQUIRES_SHARED(Locks::mutator_lock_);
++
+   const char* GetDeclaringClassDescriptor() REQUIRES_SHARED(Locks::mutator_lock_);
+ 
+   ALWAYS_INLINE const char* GetShorty() REQUIRES_SHARED(Locks::mutator_lock_);
+diff --git a/runtime/native/dalvik_system_DexFile.cc b/runtime/native/dalvik_system_DexFile.cc
+index 637e7fa..6c109f4 100644
+--- a/runtime/native/dalvik_system_DexFile.cc
++++ b/runtime/native/dalvik_system_DexFile.cc
+@@ -19,6 +19,7 @@
+ #include <sstream>
+ 
+ #include "android-base/stringprintf.h"
++#include "art_method-inl.h"
+ 
+ #include "base/file_utils.h"
+ #include "base/logging.h"
+@@ -49,6 +50,7 @@
+ #include "scoped_thread_state_change-inl.h"
+ #include "well_known_classes.h"
+ #include "zip_archive.h"
++#include "scoped_fast_native_object_access-inl.h"
+ 
+ namespace art {
+ 
+@@ -287,7 +289,6 @@ static jobject DexFile_openDexFileNative(JNIEnv* env,
+                                                                dex_elements,
+                                                                /*out*/ &oat_file,
+                                                                /*out*/ &error_msgs);
+-
+   if (!dex_files.empty()) {
+     jlongArray array = ConvertDexFilesToJavaArray(env, oat_file, dex_files);
+     if (array == nullptr) {
+@@ -816,6 +817,13 @@ static jlong DexFile_getStaticSizeOfDexFile(JNIEnv* env, jclass, jobject cookie)
+   return static_cast<jlong>(file_size);
+ }
+ 
++static void DexFile_dumpMethodCode(JNIEnv* env, jclass, jobject j_method) {
++  ScopedFastNativeObjectAccess soa(env);
++  ArtMethod* method = ArtMethod::FromReflectedMethod(soa, j_method);
++  LOG(ERROR) << "fartlog, method:" << method->GetName();
++  method->DumpArtMethod();
++}
++
+ static void DexFile_setTrusted(JNIEnv* env, jclass, jobject j_cookie) {
+   Runtime* runtime = Runtime::Current();
+   ScopedObjectAccess soa(env);
+@@ -877,7 +885,8 @@ static JNINativeMethod gMethods[] = {
+   NATIVE_METHOD(DexFile, getStaticSizeOfDexFile, "(Ljava/lang/Object;)J"),
+   NATIVE_METHOD(DexFile, getDexFileOptimizationStatus,
+                 "(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;"),
+-  NATIVE_METHOD(DexFile, setTrusted, "(Ljava/lang/Object;)V")
++  NATIVE_METHOD(DexFile, setTrusted, "(Ljava/lang/Object;)V"),
++  NATIVE_METHOD(DexFile, dumpMethodCode, "(Ljava/lang/Object;)V")
+ };
+ 
+ void register_dalvik_system_DexFile(JNIEnv* env) {

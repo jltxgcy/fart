@@ -1,0 +1,12 @@
+diff --git a/dalvik/src/main/java/dalvik/system/DexFile.java b/dalvik/src/main/java/dalvik/system/DexFile.java
+index afedba5..9f6fadf 100644
+--- a/dalvik/src/main/java/dalvik/system/DexFile.java
++++ b/dalvik/src/main/java/dalvik/system/DexFile.java
+@@ -392,6 +392,7 @@ public final class DexFile {
+     private static native Class defineClassNative(String name, ClassLoader loader, Object cookie,
+                                                   DexFile dexFile)
+             throws ClassNotFoundException, NoClassDefFoundError;
++    private static native void dumpMethodCode(Object methodid);
+     private static native String[] getClassNameList(Object cookie);
+     private static native boolean isBackedByOatFile(Object cookie);
+     private static native void setTrusted(Object cookie);
